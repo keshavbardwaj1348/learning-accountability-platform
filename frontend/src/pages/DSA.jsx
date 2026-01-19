@@ -96,7 +96,7 @@ export default function DSA() {
     const set = new Set();
     problems.forEach((p) => p.topic && set.add(p.topic));
     return ["All", ...Array.from(set).sort()];
-  }, [problems]);
+  }, [problems]); 
 
   const difficulties = useMemo(() => {
     const set = new Set();
