@@ -36,17 +36,15 @@ const register = asyncHandler(async (req, res) => {
   user.auth.refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   await user.save();
 
-  res
-    .cookie("accessToken", accessToken, {
-      ...cookieOptions,
-      maxAge: 15 * 60 * 1000,
-    })
-    .cookie("refreshToken", refreshToken, {
-      ...cookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    })
-    .status(201)
-    .json({ status: "success", message: "User registered successfully" });
+  res.status(201).json({
+    status: "success",
+    message: "User registered successfully",
+    data: {
+      accessToken,
+      user: { id: user._id, email: user.email },
+    },
+  });
+
 });
 
 /**
@@ -67,55 +65,15 @@ const login = asyncHandler(async (req, res) => {
   user.auth.refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   await user.save();
 
-  res
-    .cookie("accessToken", accessToken, {
-      ...cookieOptions,
-      maxAge: 15 * 60 * 1000,
-    })
-    .cookie("refreshToken", refreshToken, {
-      ...cookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    })
-    .json({ status: "success", message: "Login successful" });
-});
-
-/**
- * Refresh token
- */
-const refresh = asyncHandler(async (req, res) => {
-  const refreshToken = req.cookies?.refreshToken;
-  if (!refreshToken) {
-    throw new AppError("Refresh token missing", 401);
-  }
-
-  const refreshTokenHash = hashRefreshToken(refreshToken);
-
-  const user = await User.findOne({
-    "auth.refreshTokenHash": refreshTokenHash,
-    "auth.refreshTokenExpiry": { $gt: new Date() },
+  res.json({
+    status: "success",
+    message: "Login successful",
+    data: {
+      accessToken,
+      user: { id: user._id, email: user.email },
+    },
   });
 
-  if (!user) {
-    throw new AppError("Invalid or expired refresh token", 401);
-  }
-
-  const newAccessToken = generateAccessToken(user._id);
-  const newRefreshToken = generateRefreshToken();
-
-  user.auth.refreshTokenHash = hashRefreshToken(newRefreshToken);
-  user.auth.refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  await user.save();
-
-  res
-    .cookie("accessToken", newAccessToken, {
-      ...cookieOptions,
-      maxAge: 15 * 60 * 1000,
-    })
-    .cookie("refreshToken", newRefreshToken, {
-      ...cookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    })
-    .json({ status: "success", message: "Token refreshed" });
 });
 
 /**
@@ -136,10 +94,8 @@ const logout = asyncHandler(async (req, res) => {
     );
   }
 
-res
-  .clearCookie("accessToken", { ...cookieOptions, maxAge: 0 })
-  .clearCookie("refreshToken", { ...cookieOptions, maxAge: 0 })
-  .json({ status: "success", message: "Logged out successfully" });
+  res.json({ status: "success", message: "Logged out successfully" });
+
 });
 
 module.exports = { register, login, refresh, logout };
