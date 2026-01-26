@@ -1,87 +1,9 @@
-// export default function HeatmapGrid({ data = [] }) {
-//   // data: [{ date: "YYYY-MM-DD", count: number }]
-//   const map = new Map(data.map((d) => [d.date, d.count]));
-
-//   const getIntensityClass = (count) => {
-//     if (!count || count === 0) return "bg-white/5";
-//     if (count <= 2) return "bg-white/20";
-//     if (count <= 5) return "bg-white/40";
-//     if (count <= 10) return "bg-white/60";
-//     return "bg-white/80";
-//   };
-
-//   return (
-//     <div className="flex flex-wrap gap-1">
-//       {data.length === 0 ? (
-//         <p className="text-sm text-white/60">No activity yet</p>
-//       ) : (
-//         data.map((d) => (
-//           <div
-//             key={d.date}
-//             title={`${d.date} • ${map.get(d.date) || 0} activity`}
-//             className={`h-4 w-4 rounded-sm border border-white/10 ${getIntensityClass(
-//               d.count
-//             )}`}
-//           />
-//         ))
-//       )}
-//     </div>
-//   );
-// }
-
-
-// import { useState } from "react";
-
-// export default function HeatmapGrid({ data = [] }) {
-//   const [hovered, setHovered] = useState(null);
-
-//   const getIntensityClass = (count) => {
-//     if (!count || count === 0) return "bg-white/5";
-//     if (count <= 2) return "bg-white/20";
-//     if (count <= 5) return "bg-white/40";
-//     if (count <= 10) return "bg-white/60";
-//     return "bg-white/80";
-//   };
-
-//   return (
-//     <div className="relative">
-//       {/* Tooltip */}
-//       {hovered && (
-//         <div className="absolute -top-10 left-0 rounded-lg border theme-border theme-card px-3 py-2 text-xs">
-//           <span className="opacity-80">{hovered.date}</span>{" "}
-//           <span className="opacity-60">•</span>{" "}
-//           <span className="font-semibold">{hovered.count}</span>
-//         </div>
-//       )}
-
-//       <div className="flex flex-wrap gap-1 max-w-[280px]">
-//         {data.length === 0 ? (
-//           <p className="text-sm opacity-70">No activity yet</p>
-//         ) : (
-//           data.map((d) => (
-//             <div
-//               key={d.date}
-//               onMouseEnter={() => setHovered(d)}
-//               onMouseLeave={() => setHovered(null)}
-//               className={`h-4 w-4 rounded-sm border theme-border ${getIntensityClass(
-//                 d.count
-//               )}`}
-//             />
-//           ))
-//         )}
-//       </div>
-//     </div>
-//   );
-// }
-
-
 import { useMemo, useState } from "react";
 
 function formatDateLabel(dateStr) {
-  // dateStr: YYYY-MM-DD
   try {
     const d = new Date(dateStr);
-    return d.toDateString(); // simple readable
+    return d.toDateString();
   } catch {
     return dateStr;
   }
@@ -98,16 +20,15 @@ function getIntensityClass(count) {
 
 export default function HeatmapGrid({ data = [] }) {
   const [hovered, setHovered] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
   const { cells, columns } = useMemo(() => {
     if (!data || data.length === 0) {
       return { cells: [], columns: 0 };
     }
 
-    // Map counts by date string
     const map = new Map(data.map((x) => [x.date, x.count || 0]));
 
-    // Sort dates ascending
     const sorted = [...data]
       .map((x) => x.date)
       .filter(Boolean)
@@ -116,29 +37,23 @@ export default function HeatmapGrid({ data = [] }) {
     const startDate = new Date(sorted[0]);
     const endDate = new Date(sorted[sorted.length - 1]);
 
-    // Normalize start -> Monday-based grid start (or Sunday? GitHub uses Sunday rows)
-    // We'll use Sunday = 0...Saturday = 6 for rows (GitHub style)
+    // GitHub style rows: Sunday=0 ... Saturday=6
     const start = new Date(startDate);
     start.setHours(0, 0, 0, 0);
-    while (start.getDay() !== 0) {
-      start.setDate(start.getDate() - 1);
-    }
+    while (start.getDay() !== 0) start.setDate(start.getDate() - 1);
 
     const end = new Date(endDate);
     end.setHours(0, 0, 0, 0);
-    while (end.getDay() !== 6) {
-      end.setDate(end.getDate() + 1);
-    }
+    while (end.getDay() !== 6) end.setDate(end.getDate() + 1);
 
-    // Build day list from start..end
     const days = [];
     const cursor = new Date(start);
+
     while (cursor <= end) {
       const iso = cursor.toISOString().slice(0, 10);
       days.push({
         date: iso,
         count: map.get(iso) || 0,
-        // row = day of week (Sun=0..Sat=6)
         row: cursor.getDay(),
       });
       cursor.setDate(cursor.getDate() + 1);
@@ -157,11 +72,20 @@ export default function HeatmapGrid({ data = [] }) {
 
   return (
     <div className="relative">
-      {/* Tooltip */}
+      {/* ✅ Tooltip follows cursor (fixed position => never overlaps title weirdly) */}
       {hovered && (
-        <div className="absolute -top-11 left-0 rounded-lg border theme-border theme-card px-3 py-2 text-xs shadow-lg">
+        <div
+          style={{
+            position: "fixed",
+            left: tooltipPos.x + 12,
+            top: tooltipPos.y + 12,
+            zIndex: 9999,
+            pointerEvents: "none",
+          }}
+          className="rounded-lg border border-white/10 bg-black/90 px-3 py-2 text-xs text-white shadow-lg"
+        >
           <p className="font-semibold">{hovered.count} activity</p>
-          <p className="opacity-70">{formatDateLabel(hovered.date)}</p>
+          <p className="text-white/70">{formatDateLabel(hovered.date)}</p>
         </div>
       )}
 
@@ -189,12 +113,17 @@ export default function HeatmapGrid({ data = [] }) {
           {cells.map((c) => (
             <div
               key={c.date}
-              onMouseEnter={() => setHovered(c)}
+              onMouseEnter={(e) => {
+                setHovered(c);
+                setTooltipPos({ x: e.clientX, y: e.clientY });
+              }}
+              onMouseMove={(e) => {
+                setTooltipPos({ x: e.clientX, y: e.clientY });
+              }}
               onMouseLeave={() => setHovered(null)}
               className={`h-4 w-4 rounded-sm border border-white/10 ${getIntensityClass(
                 c.count
               )}`}
-              title={`${c.date} • ${c.count}`}
             />
           ))}
         </div>
